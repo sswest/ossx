@@ -1,6 +1,7 @@
 import httpx
 import pytest
 from ossx import _http as http
+from oss2 import CaseInsensitiveDict
 
 
 def handler(request):
@@ -29,3 +30,9 @@ class TestSession:
         count = 10244 - 4
         assert len(await response.read()) == len(b"test") * count
         assert await response.read() == b""
+
+
+def test_http_header():
+    headers = CaseInsensitiveDict({"Oss-Test": "test"})
+    headers2 = http.CaseInsensitiveDict(headers)
+    assert headers2["oss-test"] == "test"

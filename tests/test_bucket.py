@@ -1,3 +1,5 @@
+import random
+import string
 import logging
 import os
 
@@ -133,3 +135,13 @@ async def test_delete_object(bucket: AsyncBucket):
     result = await bucket.delete_object(key)
     assert result.status == 204
     assert not await bucket.object_exists(key)
+
+
+@pytest.mark.asyncio
+async def test_create_delete_bucket():
+    bucket_name = f"{OSS_BUCKET_NAME}-{''.join(random.choices(string.ascii_lowercase, k=6))}"
+    bucket = AsyncBucket(auth, OSS_ENDPOINT, bucket_name)
+    result = await bucket.create_bucket()
+    assert result.status == 200
+    result = await bucket.delete_bucket()
+    assert result.status == 204
