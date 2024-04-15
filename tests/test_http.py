@@ -1,7 +1,8 @@
 import httpx
 import pytest
-from ossx import _http as http
 from oss2 import CaseInsensitiveDict
+
+from ossx import _http as http
 
 
 def handler(request):

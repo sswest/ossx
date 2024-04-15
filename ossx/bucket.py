@@ -18,6 +18,7 @@ import aiofiles
 from oss2 import Bucket, compat, exceptions, utils
 from oss2.api import Service, _Base, logger
 from oss2.models import (
+    AppendObjectResult,
     BatchDeleteObjectsResult,
     BatchDeleteObjectVersionList,
     BucketCors,
@@ -27,7 +28,6 @@ from oss2.models import (
     BucketReferer,
     BucketWebsite,
     CreateLiveChannelResult,
-    DescribeRegionsResult,
     GetBucketAclResult,
     GetBucketCorsResult,
     GetBucketInfoResult,
@@ -47,10 +47,8 @@ from oss2.models import (
     GetObjectResult,
     GetServerSideEncryptionResult,
     GetTaggingResult,
-    GetUserQosInfoResult,
     GetVodPlaylistResult,
     InitMultipartUploadResult,
-    ListBucketsResult,
     ListLiveChannelResult,
     ListMultipartUploadsResult,
     ListObjectsResult,
@@ -65,12 +63,15 @@ from oss2.models import (
     RestoreConfiguration,
     ServerSideEncryptionRule,
     Tagging,
+    ListBucketsResult,
+    GetUserQosInfoResult,
     SelectObjectResult,
 )
 from oss2.select_params import SelectParameters
 
 from . import _http as http
 from .select_response import AsyncSelectResponseAdapter
+from .utils import warp_async_data
 
 T = TypeVar("T")
 ObjectPermission = Literal["default", "private", "public-read", "public-read-write"]
@@ -103,8 +104,7 @@ class _AsyncBase(_Base):
             **kwargs,
         )
         self.auth._sign_request(req, bucket_name, key)
-        co = self._async_do_request(req)
-        return co
+        return self._async_do_request(req)
 
     def _async_do_request(self, req: http.Request):
         resp = self.session.do_request(req, timeout=self.timeout)
@@ -116,13 +116,14 @@ class _AsyncBase(_Base):
 
 
 class AsyncService(Service, _AsyncBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.session = http.Session(timeout=self.timeout)
 
     _do = _AsyncBase._async_do
     _do_url = _AsyncBase._async_do_url
     _parse_result = staticmethod(_async_parse_result)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.session = http.Session(timeout=self.timeout)
 
     async def list_buckets(
         self,
@@ -148,7 +149,7 @@ class AsyncService(Service, _AsyncBase):
         data: Union[str, bytes, IO],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
     ):
-        # FIXME: wrap data
+        data = warp_async_data(data)
         result = super().write_get_object_response(route, token, fwd_status, data, headers)
         resp = await result.resp
         return RequestResult(resp)
@@ -202,12 +203,9 @@ class AsyncBucket(Bucket, _AsyncBase):
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
     ) -> PutObjectResult:
-        enable_crc = self.enable_crc
-        self.enable_crc = False
+        data = warp_async_data(data)
         result: PutObjectResult = super().put_object(key, data, headers, progress_callback)
-        self.enable_crc = enable_crc
         resp = await result.resp
-
         return PutObjectResult(resp)
 
     async def put_object_from_file(
@@ -235,25 +233,41 @@ class AsyncBucket(Bucket, _AsyncBase):
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
     ) -> PutObjectResult:
-        enable_crc = self.enable_crc
+        data = warp_async_data(data)
         result = super().put_object_with_url(sign_url, data, headers, progress_callback)
-        self.enable_crc = enable_crc
         resp = await result.resp
-        result = PutObjectResult(resp)
-
-        if self.enable_crc and result.crc is not None:
-            utils.check_crc("put object", data.crc, result.crc, result.request_id)
-        return result
+        return PutObjectResult(resp)
 
     async def put_object_with_url_from_file(
-        self, sign_url, filename, headers=None, progress_callback=None
-    ):
-        raise NotImplementedError
+        self,
+        sign_url: str,
+        filename: Union[str, Path],
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+    ) -> PutObjectResult:
+        logger.debug(
+            "Put object from file with signed url, bucket: {0}, sign_url: {1}, file path: {2}".format(
+                self.bucket_name, sign_url, filename
+            )
+        )
+        async with aiofiles.open(compat.to_unicode(filename), "rb") as f:
+            return await self.put_object_with_url(
+                sign_url, f, headers=headers, progress_callback=progress_callback
+            )
 
     async def append_object(
-        self, key, position, data, headers=None, progress_callback=None, init_crc=None
-    ):
-        raise NotImplementedError
+        self,
+        key: str,
+        position: int,
+        data: Union[str, bytes, IO],
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+        init_crc: Optional[int] = None,
+    ) -> AppendObjectResult:
+        data = warp_async_data(data)
+        result = super().append_object(key, position, data, headers, progress_callback, init_crc)
+        resp = await result.resp
+        return AppendObjectResult(resp)
 
     async def get_object(
         self,
@@ -456,6 +470,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
     ) -> PutObjectResult:
+        data = warp_async_data(data)
         result = super().upload_part(key, upload_id, part_number, data, progress_callback, headers)
         resp = await result.resp
         return PutObjectResult(resp)

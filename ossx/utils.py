@@ -1,4 +1,6 @@
-from inspect import iscoroutinefunction
+from inspect import isawaitable, iscoroutinefunction
+from io import BytesIO
+from typing import IO, AsyncIterable, Union
 
 from oss2.utils import (
     _CHUNK_SIZE,
@@ -26,6 +28,11 @@ def make_crc_adapter(data, init_crc=0, discard=0):
 
     :return: 能够调用计算CRC函数的适配器
     """
+    if isinstance(data, AwaitReadAdapter):
+        data.crc_callback = Crc64(init_crc)
+        data.discard = discard
+        return data
+
     data = to_bytes(data)
 
     # bytes or file object
@@ -34,7 +41,7 @@ def make_crc_adapter(data, init_crc=0, discard=0):
             raise ClientError("Bytes of file object adapter does not support discard bytes")
         return _BytesAndFileAdapter(data, size=_get_data_size(data), crc_callback=Crc64(init_crc))
     elif hasattr(data, "read") and iscoroutinefunction(data.read):
-        return _AwaitReadAdapter(data, crc_callback=Crc64(init_crc), discard=discard)
+        return AwaitReadAdapter(data, crc_callback=Crc64(init_crc), discard=discard)
     # file-like object
     elif hasattr(data, "read"):
         return _FileLikeAdapter(data, crc_callback=Crc64(init_crc), discard=discard)
@@ -59,6 +66,10 @@ def make_progress_adapter(data, progress_callback, size=None):
 
     :return: 能够调用进度回调函数的适配器
     """
+    if isinstance(data, AwaitReadAdapter):
+        data.progress_callback = progress_callback
+        return data
+
     data = to_bytes(data)
 
     if size is None:
@@ -66,7 +77,7 @@ def make_progress_adapter(data, progress_callback, size=None):
 
     if size is None:
         if hasattr(data, "read") and iscoroutinefunction(data.read):
-            return _AwaitReadAdapter(data, progress_callback)
+            return AwaitReadAdapter(data, progress_callback)
         if hasattr(data, "read"):
             return _FileLikeAdapter(data, progress_callback)
         elif hasattr(data, "__iter__"):
@@ -79,22 +90,30 @@ def make_progress_adapter(data, progress_callback, size=None):
         return _BytesAndFileAdapter(data, progress_callback, size)
 
 
-class _AwaitReadAdapter(object):
+def warp_async_data(data: Union[str, bytes, IO, AsyncIterable]):
+    if isinstance(data, bytes):
+        data = BytesIO(data)
+    elif isinstance(data, str):
+        data = BytesIO(data.encode("utf-8"))
+    return AwaitReadAdapter(data)
+
+
+class AwaitReadAdapter(object):
     """通过这个适配器，可以给AwaitResponse加上进度监控。
 
-    :param resp: file-like object，只要支持async read即可
+    :param f: file-like object，只要支持async read / read即可
     :param progress_callback: 进度回调函数
     """
 
     def __init__(
         self,
-        resp,
+        f,
         progress_callback=None,
         crc_callback=None,
         cipher_callback=None,
         discard=0,
     ):
-        self.fileobj = resp
+        self.fileobj = f
         self.progress_callback = progress_callback
         self.offset = 0
 
@@ -125,7 +144,9 @@ class _AwaitReadAdapter(object):
         if offset_start < self.discard and amt and self.cipher_callback:
             amt += self.discard
 
-        content = await self.fileobj.read(amt)
+        content = self.fileobj.read(amt)
+        if isawaitable(content):
+            content = await content
         if not content:
             self.read_all = True
             _invoke_progress_callback(self.progress_callback, self.offset, None)
