@@ -82,6 +82,10 @@ class Request(object):
         else:
             self.headers = headers
 
+        # not to add 'Accept-Encoding: gzip, deflate' by default
+        if "Accept-Encoding" not in self.headers:
+            self.headers["Accept-Encoding"] = "identity"
+
         if "User-Agent" not in self.headers:
             if app_name:
                 self.headers["User-Agent"] = USER_AGENT + "/" + app_name
