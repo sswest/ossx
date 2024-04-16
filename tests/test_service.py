@@ -4,6 +4,7 @@ import os
 import pytest
 from oss2 import Auth
 from oss2.api import logger
+from oss2.exceptions import AccessDenied
 from oss2.models import DescribeRegionsResult, GetUserQosInfoResult, ListBucketsResult
 
 from ossx import AsyncService
@@ -33,8 +34,9 @@ async def test_list_buckets():
 @pytest.mark.asyncio
 async def test_get_user_qos_info():
     service = AsyncService(auth, OSS_ENDPOINT)
-    result = await service.get_user_qos_info()
-    assert isinstance(result, GetUserQosInfoResult)
+    with pytest.raises(AccessDenied):
+        result = await service.get_user_qos_info()
+        assert isinstance(result, GetUserQosInfoResult)
 
 
 @pytest.mark.asyncio
