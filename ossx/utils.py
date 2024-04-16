@@ -12,7 +12,6 @@ from oss2.utils import (
     _has_data_size_attr,
     _invoke_cipher_callback,
     _invoke_crc_callback,
-    _invoke_progress_callback,
     _IterableAdapter,
     to_bytes,
 )
@@ -98,6 +97,14 @@ def warp_async_data(data: Union[str, bytes, IO, AsyncIterable]):
     return AwaitReadAdapter(data)
 
 
+async def _invoke_progress_callback(progress_callback, consumed_bytes, total_bytes):
+    if progress_callback:
+        if iscoroutinefunction(progress_callback):
+            await progress_callback(consumed_bytes, total_bytes)
+        else:
+            progress_callback(consumed_bytes, total_bytes)
+
+
 class AwaitReadAdapter(object):
     """通过这个适配器，可以给AwaitResponse加上进度监控。
 
@@ -149,9 +156,9 @@ class AwaitReadAdapter(object):
             content = await content
         if not content:
             self.read_all = True
-            _invoke_progress_callback(self.progress_callback, self.offset, None)
+            await _invoke_progress_callback(self.progress_callback, self.offset, None)
         else:
-            _invoke_progress_callback(self.progress_callback, self.offset, None)
+            await _invoke_progress_callback(self.progress_callback, self.offset, None)
 
             self.offset += len(content)
 
