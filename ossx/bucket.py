@@ -1,55 +1,70 @@
 import types
 from pathlib import Path
-from typing import Callable, Type, TypeVar, Tuple, Optional, Dict, Any, Union, IO, Literal, List
+from typing import (
+    IO,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import aiofiles
 from oss2 import Bucket, compat, exceptions, utils
-from oss2.api import _Base, logger
+from oss2.api import Service, _Base, logger
 from oss2.models import (
-    GetObjectMetaResult,
-    GetObjectResult,
-    PutObjectResult,
-    RequestResult,
-    ListObjectsV2Result,
-    ListObjectsResult,
-    RestoreConfiguration,
-    BatchDeleteObjectVersionList,
-    InitMultipartUploadResult,
     BatchDeleteObjectsResult,
-    GetObjectAclResult,
-    BucketCreateConfig,
-    PartInfo,
-    ListMultipartUploadsResult,
-    ListPartsResult,
-    GetBucketAclResult,
+    BatchDeleteObjectVersionList,
     BucketCors,
-    GetBucketCorsResult,
+    BucketCreateConfig,
     BucketLifecycle,
+    BucketLogging,
+    BucketReferer,
+    BucketWebsite,
+    CreateLiveChannelResult,
+    DescribeRegionsResult,
+    GetBucketAclResult,
+    GetBucketCorsResult,
+    GetBucketInfoResult,
     GetBucketLifecycleResult,
     GetBucketLocationResult,
-    BucketLogging,
     GetBucketLoggingResult,
-    BucketReferer,
+    GetBucketPolicyResult,
     GetBucketRefererResult,
     GetBucketStatResult,
-    GetBucketInfoResult,
-    BucketWebsite,
-    GetBucketWebsiteResult,
-    CreateLiveChannelResult,
-    LiveChannelInfo,
-    GetLiveChannelResult,
-    ListLiveChannelResult,
-    GetLiveChannelStatResult,
-    GetLiveChannelHistoryResult,
-    GetVodPlaylistResult,
-    ProcessObjectResult,
-    Tagging,
-    GetTaggingResult,
-    ServerSideEncryptionRule,
-    GetServerSideEncryptionResult,
-    ListObjectVersionsResult,
     GetBucketVersioningResult,
-    GetBucketPolicyResult,
+    GetBucketWebsiteResult,
+    GetLiveChannelHistoryResult,
+    GetLiveChannelResult,
+    GetLiveChannelStatResult,
+    GetObjectAclResult,
+    GetObjectMetaResult,
+    GetObjectResult,
+    GetServerSideEncryptionResult,
+    GetTaggingResult,
+    GetUserQosInfoResult,
+    GetVodPlaylistResult,
+    InitMultipartUploadResult,
+    ListBucketsResult,
+    ListLiveChannelResult,
+    ListMultipartUploadsResult,
+    ListObjectsResult,
+    ListObjectsV2Result,
+    ListObjectVersionsResult,
+    ListPartsResult,
+    LiveChannelInfo,
+    PartInfo,
+    ProcessObjectResult,
+    PutObjectResult,
+    RequestResult,
+    RestoreConfiguration,
+    ServerSideEncryptionRule,
+    Tagging,
 )
 
 from . import _http as http
@@ -95,6 +110,45 @@ class _AsyncBase(_Base):
     def _async_do_url(self, method, sign_url, **kwargs):
         req = http.Request(method, sign_url, app_name=self.app_name, proxies=self.proxies, **kwargs)
         return self._async_do_request(req)
+
+
+class AsyncService(Service, _AsyncBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.session = http.Session(timeout=self.timeout)
+
+    _do = _AsyncBase._async_do
+    _do_url = _AsyncBase._async_do_url
+    _parse_result = staticmethod(_async_parse_result)
+
+    async def list_buckets(
+        self,
+        prefix: str = "",
+        marker: str = "",
+        max_keys: int = 100,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+    ) -> ListBucketsResult:
+        return await super().list_buckets(prefix, marker, max_keys, params, headers)
+
+    async def get_user_qos_info(self) -> GetUserQosInfoResult:
+        return await super().get_user_qos_info()
+
+    async def describe_regions(self, regions: str = "") -> DescribeRegionsResult:
+        return await super().describe_regions(regions)
+
+    async def write_get_object_response(
+        self,
+        route: str,
+        token: str,
+        fwd_status: str,
+        data: Union[str, bytes, IO],
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+    ):
+        # FIXME: wrap data
+        result = super().write_get_object_response(route, token, fwd_status, data, headers)
+        resp = await result.resp
+        return RequestResult(resp)
 
 
 class AsyncBucket(Bucket, _AsyncBase):
