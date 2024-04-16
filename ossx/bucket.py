@@ -65,9 +65,12 @@ from oss2.models import (
     RestoreConfiguration,
     ServerSideEncryptionRule,
     Tagging,
+    SelectObjectResult,
 )
+from oss2.select_params import SelectParameters
 
 from . import _http as http
+from .select_response import AsyncSelectResponseAdapter
 
 T = TypeVar("T")
 ObjectPermission = Literal["default", "private", "public-read", "public-read-write"]
@@ -270,9 +273,25 @@ class AsyncBucket(Bucket, _AsyncBase):
         return GetObjectResult(resp, progress_callback, self.enable_crc)
 
     async def select_object(
-        self, key, sql, progress_callback=None, select_params=None, byte_range=None, headers=None
+        self,
+        key: str,
+        sql: str,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+        select_params: Optional[Dict[str, str]] = None,
+        byte_range: Optional[Tuple[int, int]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
-        raise NotImplementedError
+        result = super().select_object(
+            key, sql, progress_callback, select_params, byte_range, headers
+        )
+        resp = await result.resp
+        crc_enabled = False
+        if select_params is not None and SelectParameters.EnablePayloadCrc in select_params:
+            if str(select_params[SelectParameters.EnablePayloadCrc]).lower() == "true":
+                crc_enabled = True
+        result = SelectObjectResult(resp, progress_callback, crc_enabled)
+        result.select_resp = AsyncSelectResponseAdapter(resp, progress_callback, None, crc_enabled)
+        return result
 
     async def get_object_to_file(
         self,
