@@ -28,6 +28,7 @@ from oss2.models import (
     BucketReferer,
     BucketWebsite,
     CreateLiveChannelResult,
+    DescribeRegionsResult,
     GetBucketAclResult,
     GetBucketCorsResult,
     GetBucketInfoResult,
@@ -47,8 +48,10 @@ from oss2.models import (
     GetObjectResult,
     GetServerSideEncryptionResult,
     GetTaggingResult,
+    GetUserQosInfoResult,
     GetVodPlaylistResult,
     InitMultipartUploadResult,
+    ListBucketsResult,
     ListLiveChannelResult,
     ListMultipartUploadsResult,
     ListObjectsResult,
@@ -61,11 +64,9 @@ from oss2.models import (
     PutObjectResult,
     RequestResult,
     RestoreConfiguration,
+    SelectObjectResult,
     ServerSideEncryptionRule,
     Tagging,
-    ListBucketsResult,
-    GetUserQosInfoResult,
-    SelectObjectResult,
 )
 from oss2.select_params import SelectParameters
 

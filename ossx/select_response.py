@@ -33,7 +33,7 @@ class AsyncSelectResponseAdapter(SelectResponseAdapter):
             return b""
 
         content = b""
-        for data in self:
+        async for data in self:
             content += data
 
         return content

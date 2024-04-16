@@ -60,12 +60,15 @@ async def test_put_object(bucket: AsyncBucket):
 @pytest.mark.asyncio
 async def test_put_object_from_file(bucket: AsyncBucket):
     key = f"{OSS_PREFIX}/example.jpg"
-    filename = "tests/example.jpg"
+    filename = "tests/mock_data/example.jpg"
     result = await bucket.put_object_from_file(key, filename)
     assert result.status == 200
     obj = await bucket.get_object(key)
     with open(filename, "rb") as f:
-        assert await obj.read() == f.read()
+        data = f.read()
+        assert await obj.read() == data
+    result = await bucket.head_object(key)
+    assert result.content_length == os.path.getsize(filename)
 
 
 @pytest.mark.asyncio
@@ -81,13 +84,16 @@ async def test_put_object_with_url(bucket: AsyncBucket):
     result = await bucket.put_object_with_url(url, content)
     assert result.status == 200
 
+    result = await bucket.head_object(key)
+    assert result.content_length == OBJECT_SIZE_200KB
+
 
 @pytest.mark.asyncio
 async def test_put_object_with_url_from_file(bucket: AsyncBucket):
     LIMIT_100KB = 100 * 1024 * 8
 
     key = f"{OSS_PREFIX}/traffic-limit-test-put-object"
-    local_file_name = "tests/example.jpg"
+    local_file_name = "tests/mock_data/example.jpg"
 
     params = dict()
     params[OSS_TRAFFIC_LIMIT] = str(LIMIT_100KB)
@@ -95,6 +101,9 @@ async def test_put_object_with_url_from_file(bucket: AsyncBucket):
 
     result = await bucket.put_object_with_url_from_file(url, local_file_name)
     assert result.status == 200
+
+    result = await bucket.head_object(key)
+    assert result.content_length == os.path.getsize(local_file_name)
 
 
 @pytest.mark.asyncio

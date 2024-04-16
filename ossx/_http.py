@@ -110,6 +110,9 @@ class AwaitResponse(object):
         self.__iter = None
         self.chunker = io.BytesIO()
 
+    def __iter__(self):
+        return self
+
     def __await__(self):
         return self._await().__await__()
 
