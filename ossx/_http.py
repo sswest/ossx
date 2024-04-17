@@ -21,17 +21,18 @@ class Session:
         pool_size: Optional[int] = None,
         adapter: Optional[AsyncBaseTransport] = None,
         timeout: float = defaults.connect_timeout,
+        proxies: Optional[dict] = None,
     ):
         psize = pool_size or defaults.connection_pool_size
         limits = httpx.Limits(max_connections=psize, max_keepalive_connections=psize)
         if adapter is None:
             adapter = httpx.AsyncHTTPTransport(limits=limits)
         mounts = {"http://": adapter, "https://": adapter}
-        self.session = httpx.AsyncClient(mounts=mounts, timeout=timeout)
+        self.session = httpx.AsyncClient(mounts=mounts, timeout=timeout, proxies=proxies)
 
     def do_request(self, req: "Request", timeout: float):
         try:
-            # TODO fix proxy
+
             logger.debug(
                 "Send request, method: {0}, url: {1}, params: {2}, headers: {3}, timeout: {4}".format(
                     req.method, req.url, req.params, req.headers, timeout

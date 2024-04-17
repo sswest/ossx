@@ -15,18 +15,21 @@ from typing import (
 )
 
 import aiofiles
-from oss2 import Bucket, Service, compat, exceptions, models, utils, xml_utils
+from oss2 import Auth, Bucket, Service, compat, exceptions, models, utils, xml_utils
 from oss2.api import _Base, _make_range_string, logger
 from oss2.exceptions import ClientError
 from oss2.select_params import SelectParameters
 
 from . import _http as http
-from .models import SelectObjectResult, GetSelectObjectMetaResult
+from .models import GetSelectObjectMetaResult, SelectObjectResult
 from .utils import warp_async_data
 
 T = TypeVar("T")
 ObjectPermission = Literal["default", "private", "public-read", "public-read-write"]
 BucketPermission = Literal["private", "public-read", "public-read-write"]
+URLTypes = Union["URL", str]
+ProxyTypes = Union[URLTypes, "Proxy"]
+ProxiesTypes = Union[ProxyTypes, Dict[URLTypes, Union[None, ProxyTypes]]]
 
 
 async def _async_parse_result(
@@ -72,9 +75,31 @@ class AsyncService(Service, _AsyncBase):
     _do_url = _AsyncBase._async_do_url
     _parse_result = staticmethod(_async_parse_result)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.session = http.Session(timeout=self.timeout)
+    def __init__(
+        self,
+        auth: Auth,
+        endpoint: str,
+        session: Optional[http.Session] = None,
+        connect_timeout=None,
+        app_name: str = "",
+        proxies: Optional[ProxiesTypes] = None,
+        region: Optional[str] = None,
+        cloudbox_id: Optional[str] = None,
+        is_path_style: bool = False,
+    ):
+        super().__init__(
+            auth,
+            endpoint,
+            session,
+            connect_timeout,
+            app_name,
+            proxies,
+            region,
+            cloudbox_id,
+            is_path_style,
+        )
+        if session is None:
+            self.session = http.Session(timeout=self.timeout, proxies=proxies)
 
     async def list_buckets(
         self,
@@ -107,9 +132,39 @@ class AsyncService(Service, _AsyncBase):
 
 
 class AsyncBucket(Bucket, _AsyncBase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.session = http.Session(timeout=self.timeout)
+    def __init__(
+        self,
+        auth: Auth,
+        endpoint: str,
+        bucket_name: str,
+        is_cname: bool = False,
+        session: Optional[http.Session] = None,
+        connect_timeout: Optional[Union[float, Tuple[float, float]]] = None,
+        app_name: str = "",
+        enable_crc: bool = True,
+        proxies: Optional[ProxiesTypes] = None,
+        region: Optional[str] = None,
+        cloudbox_id: Optional[str] = None,
+        is_path_style: bool = False,
+        is_verify_object_strict: bool = True,
+    ):
+        super().__init__(
+            auth,
+            endpoint,
+            bucket_name,
+            is_cname,
+            session,
+            connect_timeout,
+            app_name,
+            enable_crc,
+            proxies,
+            region,
+            cloudbox_id,
+            is_path_style,
+            is_verify_object_strict,
+        )
+        if session is None:
+            self.session = http.Session(timeout=self.timeout, proxies=proxies)
 
     _do = _AsyncBase._async_do
     _do_url = _AsyncBase._async_do_url
