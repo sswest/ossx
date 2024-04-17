@@ -172,6 +172,9 @@ class AwaitResponse(object):
                 self.__all_read = True
             return chunk
 
+    async def close(self):
+        await self.response.aclose()
+
     @property
     def _iter(self):
         if self.__iter is None:

@@ -15,63 +15,13 @@ from typing import (
 )
 
 import aiofiles
-from oss2 import Bucket, compat, exceptions, utils
-from oss2.api import Service, _Base, logger
-from oss2.models import (
-    AppendObjectResult,
-    BatchDeleteObjectsResult,
-    BatchDeleteObjectVersionList,
-    BucketCors,
-    BucketCreateConfig,
-    BucketLifecycle,
-    BucketLogging,
-    BucketReferer,
-    BucketWebsite,
-    CreateLiveChannelResult,
-    DescribeRegionsResult,
-    GetBucketAclResult,
-    GetBucketCorsResult,
-    GetBucketInfoResult,
-    GetBucketLifecycleResult,
-    GetBucketLocationResult,
-    GetBucketLoggingResult,
-    GetBucketPolicyResult,
-    GetBucketRefererResult,
-    GetBucketStatResult,
-    GetBucketVersioningResult,
-    GetBucketWebsiteResult,
-    GetLiveChannelHistoryResult,
-    GetLiveChannelResult,
-    GetLiveChannelStatResult,
-    GetObjectAclResult,
-    GetObjectMetaResult,
-    GetObjectResult,
-    GetServerSideEncryptionResult,
-    GetTaggingResult,
-    GetUserQosInfoResult,
-    GetVodPlaylistResult,
-    InitMultipartUploadResult,
-    ListBucketsResult,
-    ListLiveChannelResult,
-    ListMultipartUploadsResult,
-    ListObjectsResult,
-    ListObjectsV2Result,
-    ListObjectVersionsResult,
-    ListPartsResult,
-    LiveChannelInfo,
-    PartInfo,
-    ProcessObjectResult,
-    PutObjectResult,
-    RequestResult,
-    RestoreConfiguration,
-    SelectObjectResult,
-    ServerSideEncryptionRule,
-    Tagging,
-)
+from oss2 import Bucket, Service, compat, exceptions, models, utils, xml_utils
+from oss2.api import _Base, _make_range_string, logger
+from oss2.exceptions import ClientError
 from oss2.select_params import SelectParameters
 
 from . import _http as http
-from .select_response import AsyncSelectResponseAdapter
+from .models import SelectObjectResult, GetSelectObjectMetaResult
 from .utils import warp_async_data
 
 T = TypeVar("T")
@@ -133,13 +83,13 @@ class AsyncService(Service, _AsyncBase):
         max_keys: int = 100,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ListBucketsResult:
+    ):
         return await super().list_buckets(prefix, marker, max_keys, params, headers)
 
-    async def get_user_qos_info(self) -> GetUserQosInfoResult:
+    async def get_user_qos_info(self) -> models.GetUserQosInfoResult:
         return await super().get_user_qos_info()
 
-    async def describe_regions(self, regions: str = "") -> DescribeRegionsResult:
+    async def describe_regions(self, regions: str = "") -> models.DescribeRegionsResult:
         return await super().describe_regions(regions)
 
     async def write_get_object_response(
@@ -149,11 +99,11 @@ class AsyncService(Service, _AsyncBase):
         fwd_status: str,
         data: Union[str, bytes, IO],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ):
+    ) -> models.RequestResult:
         data = warp_async_data(data)
         result = super().write_get_object_response(route, token, fwd_status, data, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
 
 class AsyncBucket(Bucket, _AsyncBase):
@@ -172,7 +122,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         marker: str = "",
         max_keys: int = 100,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ListObjectsResult:
+    ) -> models.ListObjectsResult:
         return await super().list_objects(prefix, delimiter, marker, max_keys, headers)
 
     async def list_objects_v2(
@@ -185,7 +135,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         encoding_type: str = "url",
         max_keys: int = 100,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ListObjectsV2Result:
+    ) -> models.ListObjectsV2Result:
         return await super().list_objects_v2(
             prefix,
             delimiter,
@@ -203,11 +153,11 @@ class AsyncBucket(Bucket, _AsyncBase):
         data: Union[str, bytes, IO],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         data = warp_async_data(data)
-        result: PutObjectResult = super().put_object(key, data, headers, progress_callback)
+        result = super().put_object(key, data, headers, progress_callback)
         resp = await result.resp
-        return PutObjectResult(resp)
+        return models.PutObjectResult(resp)
 
     async def put_object_from_file(
         self,
@@ -215,7 +165,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         filename: Union[str, Path],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
-    ):
+    ) -> models.PutObjectResult:
         headers = utils.set_content_type(http.CaseInsensitiveDict(headers), filename)
         logger.debug(
             "Put object from file, bucket: {0}, key: {1}, file path: {2}".format(
@@ -233,11 +183,11 @@ class AsyncBucket(Bucket, _AsyncBase):
         data: Union[bytes, str, IO],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         data = warp_async_data(data)
         result = super().put_object_with_url(sign_url, data, headers, progress_callback)
         resp = await result.resp
-        return PutObjectResult(resp)
+        return models.PutObjectResult(resp)
 
     async def put_object_with_url_from_file(
         self,
@@ -245,7 +195,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         filename: Union[str, Path],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         logger.debug(
             "Put object from file with signed url, bucket: {0}, sign_url: {1}, file path: {2}".format(
                 self.bucket_name, sign_url, filename
@@ -264,17 +214,17 @@ class AsyncBucket(Bucket, _AsyncBase):
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
         init_crc: Optional[int] = None,
-    ) -> AppendObjectResult:
+    ) -> models.AppendObjectResult:
         data = warp_async_data(data)
         result = super().append_object(key, position, data, headers, progress_callback, init_crc)
         resp = await result.resp
-        return AppendObjectResult(resp)
+        return models.AppendObjectResult(resp)
 
     async def get_object(
         self,
         key: str,
         byte_range: Optional[Tuple[int, int]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
         process: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
@@ -285,7 +235,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         self.enable_crc = enable_crc
         resp = await result.stream
 
-        return GetObjectResult(resp, progress_callback, self.enable_crc)
+        return models.GetObjectResult(resp, progress_callback, self.enable_crc)
 
     async def select_object(
         self,
@@ -296,17 +246,38 @@ class AsyncBucket(Bucket, _AsyncBase):
         byte_range: Optional[Tuple[int, int]] = None,
         headers: Optional[Dict[str, str]] = None,
     ):
-        result = super().select_object(
-            key, sql, progress_callback, select_params, byte_range, headers
-        )
-        resp = await result.resp
+        range_select = False
+        headers = http.CaseInsensitiveDict(headers)
+        range_string = _make_range_string(byte_range)
+        if range_string:
+            headers["range"] = range_string
+            range_select = True
+
+        if range_select is True and (
+            select_params is None
+            or (
+                SelectParameters.AllowQuotedRecordDelimiter not in select_params
+                or str(select_params[SelectParameters.AllowQuotedRecordDelimiter]).lower()
+                != "false"
+            )
+        ):
+            raise ClientError(
+                '"AllowQuotedRecordDelimiter" must be specified in select_params as False'
+                ' when "Range" is specified in header.'
+            )
+
+        body = xml_utils.to_select_object(sql, select_params)
+        params = {"x-oss-process": "csv/select"}
+        if select_params is not None and SelectParameters.Json_Type in select_params:
+            params["x-oss-process"] = "json/select"
+
+        self.timeout = 3600
+        resp = await self.__do_object("POST", key, data=body, headers=headers, params=params)
         crc_enabled = False
         if select_params is not None and SelectParameters.EnablePayloadCrc in select_params:
             if str(select_params[SelectParameters.EnablePayloadCrc]).lower() == "true":
                 crc_enabled = True
-        result = SelectObjectResult(resp, progress_callback, crc_enabled)
-        result.select_resp = AsyncSelectResponseAdapter(resp, progress_callback, None, crc_enabled)
-        return result
+        return SelectObjectResult(resp, progress_callback, crc_enabled)
 
     async def get_object_to_file(
         self,
@@ -335,21 +306,35 @@ class AsyncBucket(Bucket, _AsyncBase):
     ):
         raise NotImplementedError
 
-    async def head_object(self, key, headers=None):
+    async def head_object(
+        self,
+        key: str,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> models.HeadObjectResult:
         return await super().head_object(key, headers)
 
     async def create_select_object_meta(self, key, select_meta_params=None, headers=None):
-        raise NotImplementedError
+        headers = http.CaseInsensitiveDict(headers)
+
+        body = xml_utils.to_get_select_object_meta(select_meta_params)
+        params = {"x-oss-process": "csv/meta"}
+        if select_meta_params is not None and "Json_Type" in select_meta_params:
+            params["x-oss-process"] = "json/meta"
+
+        self.timeout = 3600
+        resp = await self.__do_object("POST", key, data=body, headers=headers, params=params)
+        return GetSelectObjectMetaResult(resp)
 
     async def get_object_meta(
         self,
         key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> GetObjectMetaResult:
+    ) -> models.GetObjectMetaResult:
         result = super().get_object_meta(key, params, headers)
         resp = await result.resp
-        return GetObjectMetaResult(resp)
+        return models.GetObjectMetaResult(resp)
 
     async def object_exists(
         self,
@@ -374,16 +359,16 @@ class AsyncBucket(Bucket, _AsyncBase):
         target_key: str,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         params: Optional[Dict[str, Any]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         result = super().copy_object(source_bucket_name, source_key, target_key, headers, params)
         resp = await result.resp
-        return PutObjectResult(resp)
+        return models.PutObjectResult(resp)
 
     async def update_object_meta(
         self,
         key: str,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]],
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         return await super().update_object_meta(key, headers)
 
     async def delete_object(
@@ -391,7 +376,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         headers = http.CaseInsensitiveDict(headers)
 
         logger.info(
@@ -403,15 +388,15 @@ class AsyncBucket(Bucket, _AsyncBase):
         logger.debug(
             "Delete object done, req_id: {0}, status_code: {1}".format(resp.request_id, resp.status)
         )
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def restore_object(
         self,
         key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-        input: Optional[RestoreConfiguration] = None,
-    ) -> RequestResult:
+        input: Optional[models.RestoreConfiguration] = None,
+    ) -> models.RequestResult:
         result = super().restore_object(key, params, headers, input)
         resp = await result.resp
         logger.debug(
@@ -419,7 +404,7 @@ class AsyncBucket(Bucket, _AsyncBase):
                 resp.request_id, resp.status
             )
         )
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def put_object_acl(
         self,
@@ -427,31 +412,31 @@ class AsyncBucket(Bucket, _AsyncBase):
         permission: Literal["default", "private", "public-read", "public-read-write"],
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().put_object_acl(key, permission, params, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def get_object_acl(
         self,
         key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> GetObjectAclResult:
+    ) -> models.GetObjectAclResult:
         return await super().get_object_acl(key, params, headers)
 
     async def batch_delete_objects(
         self,
         key_list: List[str],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> BatchDeleteObjectsResult:
+    ) -> models.BatchDeleteObjectsResult:
         return await super().batch_delete_objects(key_list, headers)
 
     async def delete_object_versions(
         self,
-        keylist_versions: BatchDeleteObjectVersionList,
+        keylist_versions: models.BatchDeleteObjectVersionList,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> BatchDeleteObjectsResult:
+    ) -> models.BatchDeleteObjectsResult:
         return await super().delete_object_versions(keylist_versions, headers)
 
     async def init_multipart_upload(
@@ -459,7 +444,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         key: str,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         params: Optional[Dict[str, Any]] = None,
-    ) -> InitMultipartUploadResult:
+    ) -> models.InitMultipartUploadResult:
         return await super().init_multipart_upload(key, headers, params)
 
     async def upload_part(
@@ -470,35 +455,35 @@ class AsyncBucket(Bucket, _AsyncBase):
         data: Union[bytes, str, IO],
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         data = warp_async_data(data)
         result = super().upload_part(key, upload_id, part_number, data, progress_callback, headers)
         resp = await result.resp
-        return PutObjectResult(resp)
+        return models.PutObjectResult(resp)
 
     async def complete_multipart_upload(
         self,
         key: str,
         upload_id: str,
-        parts: List[PartInfo],
+        parts: List[models.PartInfo],
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         enable_crc = self.enable_crc
         self.enable_crc = False
         result = super().complete_multipart_upload(key, upload_id, parts, headers)
         self.enable_crc = enable_crc
         resp = await result.resp
-        return PutObjectResult(resp)
+        return models.PutObjectResult(resp)
 
     async def abort_multipart_upload(
         self,
         key: str,
         upload_id: str,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().abort_multipart_upload(key, upload_id, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def list_multipart_uploads(
         self,
@@ -508,7 +493,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         upload_id_marker: str = "",
         max_uploads: int = 1000,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ListMultipartUploadsResult:
+    ) -> models.ListMultipartUploadsResult:
         return await super().list_multipart_uploads(
             prefix, delimiter, key_marker, upload_id_marker, max_uploads, headers
         )
@@ -523,7 +508,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         target_part_number: int,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         params: Optional[Dict[str, Any]] = None,
-    ) -> PutObjectResult:
+    ) -> models.PutObjectResult:
         result = super().upload_part_copy(
             source_bucket_name,
             source_key,
@@ -535,7 +520,7 @@ class AsyncBucket(Bucket, _AsyncBase):
             params,
         )
         resp = await result.resp
-        return PutObjectResult(resp)
+        return models.PutObjectResult(resp)
 
     async def list_parts(
         self,
@@ -544,7 +529,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         marker: str = "",
         max_parts: int = 1000,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ListPartsResult:
+    ) -> models.ListPartsResult:
         return await super().list_parts(key, upload_id, marker, max_parts, headers)
 
     async def put_symlink(
@@ -552,140 +537,140 @@ class AsyncBucket(Bucket, _AsyncBase):
         target_key: str,
         symlink_key: str,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().put_symlink(target_key, symlink_key, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def get_symlink(
         self,
         symlink_key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().get_symlink(symlink_key, params, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def create_bucket(
         self,
         permission: BucketPermission = "private",
-        input: Optional[BucketCreateConfig] = None,
+        input: Optional[models.BucketCreateConfig] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().create_bucket(permission, input, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def delete_bucket(self) -> RequestResult:
+    async def delete_bucket(self) -> models.RequestResult:
         result = super().delete_bucket()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def put_bucket_acl(self, permission: BucketPermission) -> RequestResult:
+    async def put_bucket_acl(self, permission: BucketPermission) -> models.RequestResult:
         result = super().put_bucket_acl(permission)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_acl(self) -> GetBucketAclResult:
+    async def get_bucket_acl(self) -> models.GetBucketAclResult:
         return await super().get_bucket_acl()
 
-    async def put_bucket_cors(self, input: BucketCors) -> RequestResult:
+    async def put_bucket_cors(self, input: models.BucketCors) -> models.RequestResult:
         """设置Bucket的CORS。
 
         :param input: :class:`BucketCors <oss2.models.BucketCors>` 对象或其他
         """
         result = super().put_bucket_cors(input)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_cors(self) -> GetBucketCorsResult:
+    async def get_bucket_cors(self) -> models.GetBucketCorsResult:
         return await super().get_bucket_cors()
 
     async def delete_bucket_cors(self):
         """删除Bucket的CORS配置。"""
         result = super().delete_bucket_cors()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def put_bucket_lifecycle(
         self,
-        input: BucketLifecycle,
+        input: models.BucketLifecycle,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().put_bucket_lifecycle(input, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_lifecycle(self) -> GetBucketLifecycleResult:
+    async def get_bucket_lifecycle(self) -> models.GetBucketLifecycleResult:
         return await super().get_bucket_lifecycle()
 
-    async def delete_bucket_lifecycle(self) -> RequestResult:
+    async def delete_bucket_lifecycle(self) -> models.RequestResult:
         result = super().delete_bucket_lifecycle()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_location(self) -> GetBucketLocationResult:
+    async def get_bucket_location(self) -> models.GetBucketLocationResult:
         return await super().get_bucket_location()
 
-    async def put_bucket_logging(self, input: BucketLogging) -> RequestResult:
+    async def put_bucket_logging(self, input: models.BucketLogging) -> models.RequestResult:
         result = super().put_bucket_logging(input)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_logging(self) -> GetBucketLoggingResult:
+    async def get_bucket_logging(self) -> models.GetBucketLoggingResult:
         return await super().get_bucket_logging()
 
-    async def delete_bucket_logging(self) -> RequestResult:
+    async def delete_bucket_logging(self) -> models.RequestResult:
         result = super().delete_bucket_logging()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def put_bucket_referer(self, input: BucketReferer) -> RequestResult:
+    async def put_bucket_referer(self, input: models.BucketReferer) -> models.RequestResult:
         result = super().put_bucket_referer(input)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_referer(self) -> GetBucketRefererResult:
+    async def get_bucket_referer(self) -> models.GetBucketRefererResult:
         return await super().get_bucket_referer()
 
-    async def get_bucket_stat(self) -> GetBucketStatResult:
+    async def get_bucket_stat(self) -> models.GetBucketStatResult:
         return await super().get_bucket_stat()
 
-    async def get_bucket_info(self) -> GetBucketInfoResult:
+    async def get_bucket_info(self) -> models.GetBucketInfoResult:
         return await super().get_bucket_info()
 
-    async def put_bucket_website(self, input: BucketWebsite) -> RequestResult:
+    async def put_bucket_website(self, input: models.BucketWebsite) -> models.RequestResult:
         result = super().put_bucket_website(input)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_website(self) -> GetBucketWebsiteResult:
+    async def get_bucket_website(self) -> models.GetBucketWebsiteResult:
         return await super().get_bucket_website()
 
-    async def delete_bucket_website(self) -> RequestResult:
+    async def delete_bucket_website(self) -> models.RequestResult:
         """关闭Bucket的静态网站托管功能。"""
         result = super().delete_bucket_website()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def create_live_channel(
         self,
         channel_name: str,
-        input: LiveChannelInfo,
-    ) -> CreateLiveChannelResult:
+        input: models.LiveChannelInfo,
+    ) -> models.CreateLiveChannelResult:
         return await super().create_live_channel(channel_name, input)
 
-    async def delete_live_channel(self, channel_name: str) -> RequestResult:
+    async def delete_live_channel(self, channel_name: str) -> models.RequestResult:
         """删除推流直播频道
 
         :param str channel_name: 要删除的live channel的名称
         """
         result = super().delete_live_channel(channel_name)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_live_channel(self, channel_name: str) -> GetLiveChannelResult:
+    async def get_live_channel(self, channel_name: str) -> models.GetLiveChannelResult:
         return await super().get_live_channel(channel_name)
 
     async def list_live_channel(
@@ -693,18 +678,21 @@ class AsyncBucket(Bucket, _AsyncBase):
         prefix: str = "",
         marker: str = "",
         max_keys: int = 100,
-    ) -> ListLiveChannelResult:
+    ) -> models.ListLiveChannelResult:
         return await super().list_live_channel(prefix, marker, max_keys)
 
-    async def get_live_channel_stat(self, channel_name: str) -> GetLiveChannelStatResult:
+    async def get_live_channel_stat(self, channel_name: str) -> models.GetLiveChannelStatResult:
         return await super().get_live_channel_stat(channel_name)
 
-    async def put_live_channel_status(self, channel_name: str, status: str) -> RequestResult:
+    async def put_live_channel_status(self, channel_name: str, status: str) -> models.RequestResult:
         result = super().put_live_channel_status(channel_name, status)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_live_channel_history(self, channel_name: str) -> GetLiveChannelHistoryResult:
+    async def get_live_channel_history(
+        self,
+        channel_name: str,
+    ) -> models.GetLiveChannelHistoryResult:
         return await super().get_live_channel_history(channel_name)
 
     async def post_vod_playlist(
@@ -713,27 +701,27 @@ class AsyncBucket(Bucket, _AsyncBase):
         playlist_name: str,
         start_time: int = 0,
         end_time: int = 0,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().post_vod_playlist(channel_name, playlist_name, start_time, end_time)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def get_vod_playlist(
         self,
         channel_name: str,
         start_time: int,
         end_time: int,
-    ) -> GetVodPlaylistResult:
+    ) -> models.GetVodPlaylistResult:
         result = super().get_vod_playlist(channel_name, start_time, end_time)
         resp = await result.resp
-        return GetVodPlaylistResult(resp)
+        return models.GetVodPlaylistResult(resp)
 
     async def process_object(
         self,
         key: str,
         process: str,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ProcessObjectResult:
+    ) -> models.ProcessObjectResult:
         headers = http.CaseInsensitiveDict(headers)
 
         logger.debug(
@@ -753,25 +741,25 @@ class AsyncBucket(Bucket, _AsyncBase):
 
         data = await resp.read()
         resp.read = types.MethodType(lambda: data, resp)
-        return ProcessObjectResult(resp)
+        return models.ProcessObjectResult(resp)
 
     async def put_object_tagging(
         self,
         key: str,
-        tagging: Tagging,
+        tagging: models.Tagging,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
         params: Optional[Dict[str, Any]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().put_object_tagging(key, tagging, headers, params)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def get_object_tagging(
         self,
         key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> GetTaggingResult:
+    ) -> models.GetTaggingResult:
         return await super().get_object_tagging(key, params, headers)
 
     async def delete_object_tagging(
@@ -779,43 +767,45 @@ class AsyncBucket(Bucket, _AsyncBase):
         key: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().delete_object_tagging(key, params, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def put_bucket_encryption(self, rule: ServerSideEncryptionRule) -> RequestResult:
+    async def put_bucket_encryption(
+        self, rule: models.ServerSideEncryptionRule
+    ) -> models.RequestResult:
         result = super().put_bucket_encryption(rule)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_encryption(self) -> GetServerSideEncryptionResult:
+    async def get_bucket_encryption(self) -> models.GetServerSideEncryptionResult:
         return await super().get_bucket_encryption()
 
-    async def delete_bucket_encryption(self) -> RequestResult:
+    async def delete_bucket_encryption(self) -> models.RequestResult:
         result = super().delete_bucket_encryption()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def put_bucket_tagging(
         self,
-        tagging: Tagging,
+        tagging: models.Tagging,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().put_bucket_tagging(tagging, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_tagging(self) -> GetTaggingResult:
+    async def get_bucket_tagging(self) -> models.GetTaggingResult:
         return await super().get_bucket_tagging()
 
     async def delete_bucket_tagging(
         self,
         params: Optional[Dict[str, Any]] = None,
-    ) -> RequestResult:
+    ) -> models.RequestResult:
         result = super().delete_bucket_tagging(params)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     async def list_object_versions(
         self,
@@ -825,33 +815,33 @@ class AsyncBucket(Bucket, _AsyncBase):
         max_keys: int = 100,
         versionid_marker: str = "",
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ) -> ListObjectVersionsResult:
+    ) -> models.ListObjectVersionsResult:
         return await super().list_object_versions(
             prefix, delimiter, key_marker, max_keys, versionid_marker, headers
         )
 
-    async def put_bucket_versioning(self, config, headers=None) -> RequestResult:
+    async def put_bucket_versioning(self, config, headers=None) -> models.RequestResult:
         result = super().put_bucket_versioning(config, headers)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_versioning(self) -> GetBucketVersioningResult:
+    async def get_bucket_versioning(self) -> models.GetBucketVersioningResult:
         return await super().get_bucket_versioning()
 
-    async def put_bucket_policy(self, policy: str) -> RequestResult:
+    async def put_bucket_policy(self, policy: str) -> models.RequestResult:
         result = super().put_bucket_policy(policy)
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
-    async def get_bucket_policy(self) -> GetBucketPolicyResult:
+    async def get_bucket_policy(self) -> models.GetBucketPolicyResult:
         result = super().get_bucket_policy()
         resp = await result.resp
-        return GetBucketPolicyResult(resp)
+        return models.GetBucketPolicyResult(resp)
 
-    async def delete_bucket_policy(self) -> RequestResult:
+    async def delete_bucket_policy(self) -> models.RequestResult:
         result = super().delete_bucket_policy()
         resp = await result.resp
-        return RequestResult(resp)
+        return models.RequestResult(resp)
 
     # TODO add more methods
 
