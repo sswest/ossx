@@ -302,9 +302,27 @@ class AsyncBucket(Bucket, _AsyncBase):
         raise NotImplementedError
 
     async def select_object_to_file(
-        self, key, filename, sql, progress_callback=None, select_params=None, headers=None
+        self,
+        key: str,
+        filename: str,
+        sql: str,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+        select_params: Optional[Dict[str, str]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
     ):
-        raise NotImplementedError
+        async with aiofiles.open(filename, "wb") as f:
+            result = await self.select_object(
+                key,
+                sql,
+                progress_callback=progress_callback,
+                select_params=select_params,
+                headers=headers,
+            )
+
+            async for chunk in result:
+                await f.write(chunk)
+
+        return result
 
     async def head_object(
         self,

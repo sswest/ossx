@@ -32,6 +32,10 @@ class AsyncSelectResponseAdapter(SelectResponseAdapter):
         if self.finished:
             return b""
 
+        if self.response.response.is_closed:
+            self.finished = True
+            return b""
+
         content = b""
         async for data in self:
             content += data
