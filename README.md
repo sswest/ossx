@@ -1,7 +1,6 @@
 # ossx
 
-[![Build Status](https://travis-ci.org/aliyun/ossx.svg?branch=master)](https://travis-ci.org/aliyun/ossx)
-[![Coverage Status](https://coveralls.io/repos/github/aliyun/ossx/badge.svg?branch=master)](https://coveralls.io/github/aliyun/ossx?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/sswest/ossx/badge.svg?branch=main)](https://coveralls.io/github/sswest/ossx?branch=main)
 [![PyPI version](https://badge.fury.io/py/ossx.svg)](https://badge.fury.io/py/ossx)
 
 ossx is an Aliyun OSS SDK for Python Asyncio.
