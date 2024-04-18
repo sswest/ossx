@@ -22,7 +22,7 @@ from oss2.select_params import SelectParameters
 
 from . import _http as http
 from .models import GetSelectObjectMetaResult, SelectObjectResult
-from .utils import warp_async_data
+from .utils import async_copyfileobj, warp_async_data
 
 T = TypeVar("T")
 ObjectPermission = Literal["default", "private", "public-read", "public-read-write"]
@@ -299,7 +299,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
         select_params: Optional[Dict[str, str]] = None,
         byte_range: Optional[Tuple[int, int]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
     ):
         range_select = False
         headers = http.CaseInsensitiveDict(headers)
@@ -336,25 +336,82 @@ class AsyncBucket(Bucket, _AsyncBase):
 
     async def get_object_to_file(
         self,
-        key,
-        filename,
-        byte_range=None,
-        headers=None,
-        progress_callback=None,
-        process=None,
-        params=None,
-    ):
-        raise NotImplementedError
+        key: str,
+        filename: str,
+        byte_range: Optional[Tuple[int, int]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+        process: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> models.GetObjectResult:
+        logger.debug(
+            f"Start to get object to file, bucket: {self.bucket_name}"
+            f", key: {key}, file path: {filename}"
+        )
+        async with aiofiles.open(compat.to_unicode(filename), "wb") as f:
+            result = await self.get_object(
+                key,
+                byte_range=byte_range,
+                headers=headers,
+                progress_callback=progress_callback,
+                process=process,
+                params=params,
+            )
+            await async_copyfileobj(result, f, result.content_length, request_id=result.request_id)
+
+            if self.enable_crc and byte_range is None:
+                if (
+                    (headers is None)
+                    or ("Accept-Encoding" not in headers)
+                    or (headers["Accept-Encoding"] != "gzip")
+                ):
+                    utils.check_crc("get", result.client_crc, result.server_crc, result.request_id)
+
+        return result
 
     async def get_object_with_url(
-        self, sign_url, byte_range=None, headers=None, progress_callback=None
-    ):
-        raise NotImplementedError
+        self,
+        sign_url: str,
+        byte_range: Optional[Tuple[int, int]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+    ) -> models.GetObjectResult:
+        headers = http.CaseInsensitiveDict(headers)
+
+        range_string = _make_range_string(byte_range)
+        if range_string:
+            headers["range"] = range_string
+
+        logger.debug(
+            f"Start to get object with url, bucket: {self.bucket_name}, sign_url: {sign_url},"
+            f" range: {range_string}, headers: {headers}"
+        )
+        resp = await self._do_url("GET", sign_url, headers=headers)
+        return models.GetObjectResult(resp, progress_callback, self.enable_crc)
 
     async def get_object_with_url_to_file(
-        self, sign_url, filename, byte_range=None, headers=None, progress_callback=None
-    ):
-        raise NotImplementedError
+        self,
+        sign_url: str,
+        filename: str,
+        byte_range: Optional[Tuple[int, int]] = None,
+        headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
+        progress_callback: Optional[Callable[[int, Optional[int]], Any]] = None,
+    ) -> models.GetObjectResult:
+        logger.debug(
+            f"Start to get object with url, bucket: {self.bucket_name}, sign_url: {sign_url}"
+            f", file path: {filename}, range: {byte_range}, headers: {headers}"
+        )
+
+        async with aiofiles.open(compat.to_unicode(filename), "wb") as f:
+            result = await self.get_object_with_url(
+                sign_url,
+                byte_range=byte_range,
+                headers=headers,
+                progress_callback=progress_callback,
+            )
+            await async_copyfileobj(result, f, result.content_length, request_id=result.request_id)
+
+        return result
 
     async def select_object_to_file(
         self,
