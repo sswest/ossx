@@ -1,18 +1,16 @@
-import time
-
 import calendar
 import csv
 import re
+import time
 
-import oss2
 from oss2.exceptions import (
     ClientError,
-    SelectOperationFailed,
     SelectOperationClientError,
+    SelectOperationFailed,
 )
-from .common import *
-
 from oss2.select_response import SelectResponseAdapter
+
+from .common import *
 
 
 def now():
