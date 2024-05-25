@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ossx"
-version = "0.2.18a3"
+version = "2.18.4"
 description = "aliyun oss sdk for python async"
 authors = ["sswest"]
 readme = "README.md"
@@ -8,8 +8,8 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.8"
 aiofiles = "^0.7.0"
-oss2 = "2.18.4"
-httpx = "0.27.0"
+oss2 = "^2.18"
+httpx = "^0.23"
 
 [tool.poetry.group.dev.dependencies]
 coveralls = "^3.3.1"

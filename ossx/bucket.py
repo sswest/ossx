@@ -108,7 +108,7 @@ class AsyncService(Service, _AsyncBase):
         max_keys: int = 100,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Union[dict, http.CaseInsensitiveDict]] = None,
-    ):
+    ) -> models.ListBucketsResult:
         return await super().list_buckets(prefix, marker, max_keys, params, headers)
 
     async def get_user_qos_info(self) -> models.GetUserQosInfoResult:
