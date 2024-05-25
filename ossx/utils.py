@@ -1,7 +1,9 @@
+import os
 from inspect import isawaitable, iscoroutinefunction
 from io import BytesIO
 from typing import IO, AsyncIterable, Union
 
+from oss2.exceptions import InconsistentError
 from oss2.utils import (
     _CHUNK_SIZE,
     ClientError,
@@ -15,6 +17,31 @@ from oss2.utils import (
     _IterableAdapter,
     to_bytes,
 )
+
+_WINDOWS = os.name == "nt"
+COPY_BUFSIZE = 1024 * 1024 if _WINDOWS else 64 * 1024
+
+
+async def async_copyfileobj(
+    fsrc,
+    fdst,
+    expected_len=None,
+    request_id="",
+    length=COPY_BUFSIZE,
+):
+    fsrc_read = fsrc.read
+    fdst_write = fdst.write
+    num_read = 0
+    while True:
+        buf = await fsrc_read(length)
+        if not buf:
+            break
+
+        num_read += len(buf)
+        await fdst_write(buf)
+
+    if expected_len and num_read != expected_len:
+        raise InconsistentError("IncompleteRead from source", request_id)
 
 
 def make_crc_adapter(data, init_crc=0, discard=0):

@@ -116,7 +116,50 @@ async def test_get_object(bucket: AsyncBucket):
     assert await obj.read() == data
     byte_range = (11, 21)
     obj = await bucket.get_object(key, byte_range=byte_range)
+    assert obj.status == 206
     assert await obj.read() == data[byte_range[0] : byte_range[1] + 1]
+
+
+@pytest.mark.asyncio
+async def test_get_object_to_file(bucket: AsyncBucket):
+    key = f"{OSS_PREFIX}/get_object_to_file.txt"
+    data = b"hello world" * 1000
+    result = await bucket.put_object(key, data)
+    assert result.status == 200
+    filename = "tests/mock_data/get_object_to_file.txt"
+    result = await bucket.get_object_to_file(key, filename)
+    assert result.status == 200
+    with open(filename, "rb") as f:
+        assert f.read() == data
+    byte_range = (11, 21)
+    filename = "tests/mock_data/get_object_to_file.txt"
+    result = await bucket.get_object_to_file(key, filename, byte_range=byte_range)
+    assert result.status == 206
+    with open(filename, "rb") as f:
+        assert f.read() == data[byte_range[0] : byte_range[1] + 1]
+    os.remove(filename)
+
+
+@pytest.mark.asyncio
+async def test_get_object_with_url_to_file_chunked(bucket):
+    # object后缀为txt, length >= 1024, 指定Accept-Encoding接收，服务器将会以chunked模式传输数据
+    key = f"{OSS_PREFIX}/test_get_object_with_url_to_file_chunked.txt"
+    content = b"a" * 1024
+    await bucket.put_object(key, content)
+
+    filename = f"tests/mock_Data/test_get_object_with_url_to_file_chunked-local.txt"
+    url = bucket.sign_url("GET", key, 240)
+    result = await bucket.get_object_with_url_to_file(
+        url, filename, headers={"Accept-Encoding": "gzip"}
+    )
+
+    assert result.headers["Transfer-Encoding"] == "chunked"
+
+    with open(filename, "rb") as f:
+        assert f.read() == content
+
+    await bucket.delete_object(key)
+    os.remove(filename)
 
 
 @pytest.mark.asyncio
