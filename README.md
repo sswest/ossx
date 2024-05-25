@@ -15,6 +15,12 @@ From the user's perspective, the use of ossx and oss2 should be very similar, in
 
 **Please note, this library will monkey patch a small number of functions in the oss2 library, usually we believe this will not affect the independent use of the oss2 library, for details please see `ossx/patch.py`.**
 
+## Compatibility
+
+Starting from version 2.18.4, ossx will synchronize with the version numbers of the official Aliyun SDK in subsequent releases. When releasing new versions, OSSX will strive to achieve forward compatibility as much as possible. Currently, we guarantee that a minor version of OSSX can be compatible with lower versions of oss2.
+
+It is recommended to keep the version numbers of ossx and oss2 consistent to reduce compatibility issues.
+
 ## Getting Started
 
 ### Installation
@@ -43,7 +49,8 @@ async def main():
     assert await obj.read() == content
     assert await obj.read() == b''
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())
 ```
 
 You can find the API use cases currently supported in the `tests` directory.

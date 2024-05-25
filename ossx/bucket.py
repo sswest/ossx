@@ -15,13 +15,13 @@ from typing import (
 )
 
 import aiofiles
-from oss2 import Auth, Bucket, Service, compat, exceptions, models, utils, xml_utils
+from oss2 import Auth, Bucket, Service, compat, exceptions, utils, xml_utils
 from oss2.api import _Base, _make_range_string, logger
 from oss2.exceptions import ClientError
 from oss2.select_params import SelectParameters
 
 from . import _http as http
-from .models import GetSelectObjectMetaResult, SelectObjectResult
+from . import models
 from .utils import async_copyfileobj, warp_async_data
 
 T = TypeVar("T")
@@ -129,6 +129,13 @@ class AsyncService(Service, _AsyncBase):
         result = super().write_get_object_response(route, token, fwd_status, data, headers)
         resp = await result.resp
         return models.RequestResult(resp)
+
+    async def list_user_data_redundancy_transition(
+        self,
+        continuation_token: str = "",
+        max_keys: int = 100,
+    ) -> models.ListUserDataRedundancyTransitionResult:
+        return await super().list_user_data_redundancy_transition(continuation_token, max_keys)
 
 
 class AsyncBucket(Bucket, _AsyncBase):
@@ -332,7 +339,7 @@ class AsyncBucket(Bucket, _AsyncBase):
         if select_params is not None and SelectParameters.EnablePayloadCrc in select_params:
             if str(select_params[SelectParameters.EnablePayloadCrc]).lower() == "true":
                 crc_enabled = True
-        return SelectObjectResult(resp, progress_callback, crc_enabled)
+        return models.SelectObjectResult(resp, progress_callback, crc_enabled)
 
     async def get_object_to_file(
         self,
@@ -454,7 +461,7 @@ class AsyncBucket(Bucket, _AsyncBase):
 
         self.timeout = 3600
         resp = await self.__do_object("POST", key, data=body, headers=headers, params=params)
-        return GetSelectObjectMetaResult(resp)
+        return models.GetSelectObjectMetaResult(resp)
 
     async def get_object_meta(
         self,
@@ -1200,6 +1207,45 @@ class AsyncBucket(Bucket, _AsyncBase):
         result = super().delete_bucket_callback_policy()
         resp = await result.resp
         return models.RequestResult(resp)
+
+    async def put_bucket_archive_direct_read(self, enabled: bool = False) -> models.RequestResult:
+        result = super().put_bucket_archive_direct_read(enabled)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_bucket_archive_direct_read(self) -> models.GetBucketArchiveDirectReadResult:
+        return await super().get_bucket_archive_direct_read()
+
+    async def put_bucket_https_config(
+        self, httpsConfig: models.BucketTlsVersion
+    ) -> models.RequestResult:
+        result = super().put_bucket_https_config(httpsConfig)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def create_bucket_data_redundancy_transition(
+        self,
+        targetType: str,
+    ) -> models.CreateDataRedundancyTransitionResult:
+        return await super().create_bucket_data_redundancy_transition(targetType)
+
+    async def get_bucket_data_redundancy_transition(
+        self, taskId: str
+    ) -> models.DataRedundancyTransitionInfoResult:
+        return await super().get_bucket_data_redundancy_transition(taskId)
+
+    async def delete_bucket_data_redundancy_transition(self, taskId: str) -> models.RequestResult:
+        result = super().delete_bucket_data_redundancy_transition(taskId)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_bucket_https_config(self) -> models.HttpsConfigResult:
+        return await super().get_bucket_https_config()
+
+    async def list_bucket_data_redundancy_transition(
+        self,
+    ) -> models.ListBucketDataRedundancyTransitionResult:
+        return await super().list_bucket_data_redundancy_transition()
 
     def __do_object(self, method, key, **kwargs):
         if not self.bucket_name:
