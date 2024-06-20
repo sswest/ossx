@@ -2,7 +2,6 @@ import struct
 from asyncio import iscoroutinefunction
 from typing import Callable, Optional
 
-from black import Any
 from oss2 import utils
 from oss2.exceptions import (
     InconsistentError,
