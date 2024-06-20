@@ -1,6 +1,6 @@
 import struct
 from asyncio import iscoroutinefunction
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from oss2 import utils
 from oss2.exceptions import (

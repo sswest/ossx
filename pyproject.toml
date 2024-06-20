@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ossx"
-version = "2.18.5.post1"
+version = "2.18.5.post2"
 description = "aliyun oss sdk for python async"
 authors = ["sswest"]
 readme = "README.md"
