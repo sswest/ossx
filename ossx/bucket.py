@@ -137,6 +137,90 @@ class AsyncService(Service, _AsyncBase):
     ) -> models.ListUserDataRedundancyTransitionResult:
         return await super().list_user_data_redundancy_transition(continuation_token, max_keys)
 
+    async def list_access_points(
+        self,
+        max_keys: int = 100,
+        continuation_token: str = "",
+    ) -> models.ListAccessPointResult:
+        return await super().list_access_points(max_keys, continuation_token)
+
+    async def put_public_access_block(
+        self,
+        block_public_access: bool = False,
+    ) -> models.RequestResult:
+        result = super().put_public_access_block(block_public_access)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_public_access_block(self) -> models.GetPublicAccessBlockResult:
+        return await super().get_public_access_block()
+
+    async def delete_public_access_block(self) -> models.RequestResult:
+        result = super().delete_public_access_block()
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def list_resource_pools(
+        self,
+        continuation_token: str = "",
+        max_keys: int = 100,
+    ) -> models.ListResourcePoolsResult:
+        return await super().list_resource_pools(continuation_token, max_keys)
+
+    async def get_resource_pool_info(
+        self,
+        resource_pool_name: str,
+    ) -> models.ResourcePoolInfoResult:
+        return await super().get_resource_pool_info(resource_pool_name)
+
+    async def list_resource_pool_buckets(
+        self,
+        resource_pool_name: str,
+        continuation_token: str = "",
+        max_keys: int = 100,
+    ) -> models.ListResourcePoolBucketsResult:
+        return await super().list_resource_pool_buckets(
+            resource_pool_name, continuation_token, max_keys
+        )
+
+    async def put_resource_pool_requester_qos_info(
+        self,
+        uid: str,
+        resource_pool_name: str,
+        qos_configuration: models.QoSConfiguration,
+    ) -> models.RequestResult:
+        result = super().put_resource_pool_requester_qos_info(
+            uid, resource_pool_name, qos_configuration
+        )
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_resource_pool_requester_qos_info(
+        self,
+        uid: str,
+        resource_pool_name: str,
+    ) -> models.RequesterQoSInfoResult:
+        return await super().get_resource_pool_requester_qos_info(uid, resource_pool_name)
+
+    async def list_resource_pool_requester_qos_infos(
+        self,
+        resource_pool_name: str,
+        continuation_token: str = "",
+        max_keys: int = 100,
+    ) -> models.ListResourcePoolRequesterQoSInfosResult:
+        return await super().list_resource_pool_requester_qos_infos(
+            resource_pool_name, continuation_token, max_keys
+        )
+
+    async def delete_resource_pool_requester_qos_info(
+        self,
+        uid: str,
+        resource_pool_name: str,
+    ) -> models.RequestResult:
+        result = super().delete_resource_pool_requester_qos_info(uid, resource_pool_name)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
 
 class AsyncBucket(Bucket, _AsyncBase):
     def __init__(
@@ -1246,6 +1330,117 @@ class AsyncBucket(Bucket, _AsyncBase):
         self,
     ) -> models.ListBucketDataRedundancyTransitionResult:
         return await super().list_bucket_data_redundancy_transition()
+
+    async def create_access_point(
+        self,
+        accessPoint: models.CreateAccessPointRequest,
+    ) -> models.CreateAccessPointResult:
+        return await super().create_access_point(accessPoint)
+
+    async def get_access_point(self, accessPointName: str) -> models.GetAccessPointResult:
+        return await super().get_access_point(accessPointName)
+
+    async def delete_access_point(self, accessPointName: str) -> models.RequestResult:
+        result = super().delete_access_point(accessPointName)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def list_bucket_access_points(
+        self,
+        max_keys: int = 100,
+        continuation_token: str = "",
+    ) -> models.ListAccessPointResult:
+        return await super().list_bucket_access_points(max_keys, continuation_token)
+
+    async def put_access_point_policy(
+        self,
+        accessPointName: str,
+        accessPointPolicy: str,
+    ) -> models.RequestResult:
+        result = super().put_access_point_policy(accessPointName, accessPointPolicy)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_access_point_policy(
+        self,
+        accessPointName: str,
+    ) -> models.GetAccessPointPolicyResult:
+        """获取接入点策略
+        :param str accessPointName: 接入点名称
+        :return: :class:`GetAccessPointPolicyResult <oss2.models.GetAccessPointPolicyResult>`
+        """
+        result = super().get_access_point_policy(accessPointName)
+        resp = await result.resp
+        return models.GetAccessPointPolicyResult(resp)
+
+    async def delete_access_point_policy(self, accessPointName: str) -> models.RequestResult:
+        result = super().delete_access_point_policy(accessPointName)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def put_bucket_public_access_block(
+        self, block_public_access: bool = False
+    ) -> models.RequestResult:
+        result = super().put_bucket_public_access_block(block_public_access)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_bucket_public_access_block(self) -> models.GetBucketPublicAccessBlockResult:
+        return await super().get_bucket_public_access_block()
+
+    async def delete_bucket_public_access_block(self) -> models.RequestResult:
+        result = super().delete_bucket_public_access_block()
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def put_access_point_public_access_block(
+        self,
+        access_point_name: str,
+        block_public_access: bool = False,
+    ) -> models.RequestResult:
+        result = super().put_access_point_public_access_block(
+            access_point_name, block_public_access
+        )
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_access_point_public_access_block(
+        self,
+        access_point_name: str,
+    ) -> models.GetBucketPublicAccessBlockResult:
+        return await super().get_access_point_public_access_block(access_point_name)
+
+    async def delete_access_point_public_access_block(
+        self,
+        access_point_name: str,
+    ) -> models.RequestResult:
+        result = super().delete_access_point_public_access_block(access_point_name)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def put_bucket_requester_qos_info(
+        self,
+        uid: str,
+        qos_configuration: models.QoSConfiguration,
+    ) -> models.RequestResult:
+        result = super().put_bucket_requester_qos_info(uid, qos_configuration)
+        resp = await result.resp
+        return models.RequestResult(resp)
+
+    async def get_bucket_requester_qos_info(self, uid: str) -> models.RequesterQoSInfoResult:
+        return await super().get_bucket_requester_qos_info(uid)
+
+    async def list_bucket_requester_qos_infos(
+        self,
+        continuation_token: str = "",
+        max_keys: int = 100,
+    ) -> models.ListBucketRequesterQoSInfosResult:
+        return await super().list_bucket_requester_qos_infos(continuation_token, max_keys)
+
+    async def delete_bucket_requester_qos_info(self, uid: str) -> models.RequestResult:
+        result = super().delete_bucket_requester_qos_info(uid)
+        resp = await result.resp
+        return models.RequestResult(resp)
 
     def __do_object(self, method, key, **kwargs):
         if not self.bucket_name:

@@ -18,8 +18,12 @@ OSS_ACCESS_KEY_SECRET = os.getenv("OSS_ACCESS_KEY_SECRET")
 OSS_ENDPOINT = os.getenv("OSS_ENDPOINT")
 OSS_BUCKET_NAME = os.getenv("OSS_BUCKET_NAME")
 OSS_PREFIX = os.getenv("OSS_PREFIX")
+OSS_TEST_UID = os.getenv("OSS_TEST_UID")
 auth = Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
 sync_bucket = Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
+
+
+TEST_QOS_AND_RESOURCE_POOL = False  # 该功能为邀测功能，未对全部用户开放
 
 
 @pytest.fixture

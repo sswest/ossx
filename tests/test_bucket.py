@@ -1,3 +1,4 @@
+import asyncio
 import random
 import string
 
@@ -101,7 +102,7 @@ async def test_https_config_exception_3(bucket):
 @pytest.mark.asyncio
 async def test_bucket_data_redundancy_transition_normal(service, bucket):
     try:
-        result = await bucket.create_bucket_data_redundancy_transition('ZRS')
+        result = await bucket.create_bucket_data_redundancy_transition("ZRS")
     except oss2.exceptions.ServerError as e:
         assert e.code == "BucketDataRedundancyTransitionTaskNotSupport"
         return
@@ -112,7 +113,9 @@ async def test_bucket_data_redundancy_transition_normal(service, bucket):
     assert get_result.task_id is not None
     assert get_result.transition_status is not None
 
-    list_user_result = await service.list_user_data_redundancy_transition(continuation_token='', max_keys=10)
+    list_user_result = await service.list_user_data_redundancy_transition(
+        continuation_token="", max_keys=10
+    )
     assert list_user_result.status == 200
     model = list_user_result.data_redundancy_transitions[0]
     assert model.bucket == OSS_BUCKET_NAME
@@ -138,3 +141,48 @@ async def test_bucket_data_redundancy_transition_normal(service, bucket):
 
     del_result = await bucket.delete_bucket_data_redundancy_transition(result.task_id)
     assert del_result.status == 204
+
+
+@pytest.mark.skipif(oss2.__version__ < "2.19.0", reason="oss2 version is too low")
+@pytest.mark.asyncio
+async def test_bucket_stat_param_deep_cold_archive(service):
+    bucket_name = OSS_BUCKET_NAME + "-test-stat-deep-cold"
+    bucket = AsyncBucket(auth, OSS_ENDPOINT, bucket_name)
+    await bucket.create_bucket(oss2.BUCKET_ACL_PRIVATE)
+
+    await asyncio.sleep(1)
+    list_buckets = await service.list_buckets(prefix=bucket.bucket_name)
+    for b in list_buckets.buckets:
+        assert bucket.bucket_name in b.name
+
+    key = "b.txt"
+    await bucket.put_object(key, "content")
+    await asyncio.sleep(1)
+
+    result = await bucket.get_bucket_stat()
+    assert result.object_count == 1
+    assert result.multi_part_upload_count == 0
+    assert result.storage_size_in_bytes == 7
+    assert result.live_channel_count == 0
+    assert result.last_modified_time is not None
+    assert result.standard_storage == 7
+    assert result.standard_object_count == 1
+    assert result.infrequent_access_storage == 0
+    assert result.infrequent_access_real_storage == 0
+    assert result.infrequent_access_object_count == 0
+    assert result.archive_storage == 0
+    assert result.archive_real_storage == 0
+    assert result.archive_object_count == 0
+    assert result.cold_archive_storage == 0
+    assert result.cold_archive_real_storage == 0
+    assert result.cold_archive_object_count == 0
+    assert result.deep_cold_archive_storage == 0
+    assert result.deep_cold_archive_real_storage == 0
+    assert result.deep_cold_archive_object_count == 0
+
+    await bucket.delete_object(key)
+    await bucket.delete_bucket()
+
+    await asyncio.sleep(1)
+    with pytest.raises(oss2.exceptions.NoSuchBucket):
+        await bucket.delete_bucket()
