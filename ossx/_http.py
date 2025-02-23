@@ -5,7 +5,7 @@ import logging
 from typing import Any, AsyncIterator, Callable, Coroutine, Optional
 
 import httpx
-from aiofiles.threadpool import AsyncBufferedReader
+from aiofiles.threadpool.binary import AsyncBufferedReader
 from httpx import AsyncBaseTransport
 from oss2 import compat, defaults, exceptions, models, utils
 from oss2.http import USER_AGENT
@@ -28,7 +28,10 @@ class Session:
         if adapter is None:
             adapter = httpx.AsyncHTTPTransport(limits=limits)
         mounts = {"http://": adapter, "https://": adapter}
-        self.session = httpx.AsyncClient(mounts=mounts, timeout=timeout, proxies=proxies)
+        if httpx.__version__ >= "0.26.0":
+            self.session = httpx.AsyncClient(mounts=mounts, timeout=timeout, proxy=proxies)
+        else:
+            self.session = httpx.AsyncClient(mounts=mounts, timeout=timeout, proxies=proxies)
 
     def do_request(self, req: "Request", timeout: float):
         try:
