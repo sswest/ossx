@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import io
 import logging
 from typing import Any, AsyncIterator, Callable, Coroutine, Optional
 
@@ -116,7 +115,7 @@ class AwaitResponse(object):
 
         self.__all_read = False
         self.__iter = None
-        self.chunker = io.BytesIO()
+        self.chunker = bytearray()
 
     def __iter__(self):
         return self
@@ -156,23 +155,24 @@ class AwaitResponse(object):
             return b""
 
         if amt is None:
-            content_list = [self.chunker.getvalue()]
+            content_list = [bytes(self.chunker)]
             async for chunk in self._iter:
                 content_list.append(chunk)
             content = b"".join(content_list)
-            self.chunker = io.BytesIO()
+            self.chunker = bytearray()
             self.__all_read = True
             return content
         else:
-            while len(self.chunker.getbuffer()) <= amt:
+            while len(self.chunker) <= amt:
                 try:
-                    self.chunker.write(await self._iter.__anext__())
+                    self.chunker.extend(await self._iter.__anext__())
                 except StopAsyncIteration:
                     break
 
-            chunk = self.chunker.getvalue()[:amt]
-            self.chunker = io.BytesIO(self.chunker.getvalue()[amt:])
-            if len(self.chunker.getbuffer()) == 0:
+            chunk = bytes(self.chunker[:amt])
+            del self.chunker[:amt]
+
+            if not self.chunker:
                 self.__all_read = True
             return chunk
 
